@@ -24,11 +24,14 @@
         ice:        "#B2DCFF"
     };
 
-    // Card colors (6 vibrant ones from the palette)
-    const CARD_COLORS = [C.crimson, C.orange, C.gold, C.lime, C.sky, C.pink];
+    // Card colors (8 vibrant ones from the palette)
+    const CARD_COLORS = [C.crimson, C.orange, C.gold, C.lime, C.sky, C.pink, C.bronze, C.forest];
 
     // Shape names
-    const SHAPES = ["Circle", "Square", "Triangle", "Star", "Heart", "Diamond"];
+    const SHAPES = ["Circle", "Square", "Triangle", "Star", "Heart", "Diamond", "Pentagon", "Hexagon"];
+
+    // Total pairs count
+    const TOTAL_PAIRS = SHAPES.length; // 8
 
     // ─── Game Constants ──────────────────────────────────────────
     const INTERNAL_W = 640;
@@ -39,7 +42,7 @@
 
     // Grid layout for cards
     const COLS = 4;
-    const ROWS = 3;
+    const ROWS = 4;
 
     // ─── Game States ─────────────────────────────────────────────
     const STATE = {
@@ -237,9 +240,30 @@
                 ctx.closePath();
                 ctx.fill();
                 break;
+
+            case "Pentagon":
+                drawPolygon(cx, cy, 5, s * 0.45);
+                break;
+
+            case "Hexagon":
+                drawPolygon(cx, cy, 6, s * 0.45);
+                break;
         }
 
         ctx.restore();
+    }
+
+    function drawPolygon(cx, cy, sides, radius) {
+        ctx.beginPath();
+        for (let i = 0; i < sides; i++) {
+            const angle = (Math.PI * 2 / sides) * i - Math.PI / 2;
+            const x = cx + Math.cos(angle) * radius;
+            const y = cy + Math.sin(angle) * radius;
+            if (i === 0) ctx.moveTo(x, y);
+            else ctx.lineTo(x, y);
+        }
+        ctx.closePath();
+        ctx.fill();
     }
 
     function drawStar(cx, cy, spikes, outerR, innerR) {
@@ -444,7 +468,7 @@
         ctx.shadowColor = C.lime;
         ctx.shadowBlur = 4;
         ctx.fillStyle = C.lime;
-        ctx.fillText(`${matchedPairs}/6`, INTERNAL_W - 16, 8);
+        ctx.fillText(`${matchedPairs}/${TOTAL_PAIRS}`, INTERNAL_W - 16, 8);
         ctx.restore();
     }
 
@@ -593,24 +617,26 @@
         ctx.fillText("▸ MEMORY MATCH ◂", cx, cy + 80);
         ctx.restore();
 
-        // Flash cards preview shapes floating
+        // Flash cards preview shapes floating (two rows)
         ctx.save();
         const t = Date.now() / 1000;
         const previewShapes = [
-            { shape: "Circle", color: C.crimson, ox: -180, oy: 130 },
-            { shape: "Square", color: C.orange, ox: -100, oy: 140 },
-            { shape: "Triangle", color: C.gold, ox: -20, oy: 135 },
-            { shape: "Star", color: C.lime, ox: 60, oy: 142 },
-            { shape: "Heart", color: C.sky, ox: 140, oy: 130 },
-            { shape: "Diamond", color: C.pink, ox: 220, oy: 138 },
+            { shape: "Circle",    color: C.crimson, ox: -210, oy: 120 },
+            { shape: "Square",    color: C.orange,  ox: -147, oy: 128 },
+            { shape: "Triangle",  color: C.gold,    ox: -85,  oy: 118 },
+            { shape: "Star",      color: C.lime,    ox: -22,  oy: 126 },
+            { shape: "Heart",     color: C.sky,     ox: 40,   oy: 116 },
+            { shape: "Diamond",   color: C.pink,    ox: 103,  oy: 124 },
+            { shape: "Pentagon",  color: C.bronze,  ox: 165,  oy: 114 },
+            { shape: "Hexagon",   color: C.forest,  ox: 228,  oy: 122 },
         ];
         previewShapes.forEach((s, i) => {
-            const fy = s.oy + Math.sin(t * 1.5 + i * 1.2) * 8;
-            ctx.globalAlpha = 0.4 + Math.sin(t + i) * 0.2;
+            const fy = s.oy + Math.sin(t * 1.5 + i * 0.9) * 8;
+            ctx.globalAlpha = 0.4 + Math.sin(t + i * 0.8) * 0.2;
             ctx.shadowColor = s.color;
             ctx.shadowBlur = 8;
             ctx.fillStyle = s.color;
-            drawCardShape(cx + s.ox, cy + fy, 35, s.shape, s.color);
+            drawCardShape(cx + s.ox, cy + fy, 30, s.shape, s.color);
         });
         ctx.restore();
 
@@ -822,7 +848,7 @@
             ctx.shadowColor = C.gray;
             ctx.shadowBlur = 5;
             ctx.fillStyle = C.gray;
-            ctx.fillText(`Pairs found: ${matchedPairs}/6`, cx, cy - 30);
+            ctx.fillText(`Pairs found: ${matchedPairs}/${TOTAL_PAIRS}`, cx, cy - 30);
         }
 
         // Score display
@@ -936,7 +962,7 @@
             matchFlashTimer = 0.3;
 
             // Check win
-            if (matchedPairs === 6) {
+            if (matchedPairs === TOTAL_PAIRS) {
                 setTimeout(() => {
                     gameState = STATE.WIN;
                     particles = [];
