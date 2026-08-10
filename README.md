@@ -1,10 +1,6 @@
 # Prism Panic
 
-A memory match flash card game built with HTML5 Canvas and vanilla JavaScript.
-
-## Overview
-
-**Prism Panic** challenges players to find all 8 matching pairs of colored shapes on a 4×4 grid of flash cards before the 5-minute timer runs out. Each card features a unique shape and color combination from the Arne16 color palette.
+A memory match flash card game built with HTML5 Canvas and vanilla JavaScript. **Prism Panic** challenges players to find all 8 matching pairs of colored shapes on a 4×4 grid of flash cards before the 5-minute timer runs out. Each card features a unique shape and color combination from the Arne16 color palette.
 
 ## How to Play
 
