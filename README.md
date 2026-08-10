@@ -1,78 +1,53 @@
-# Prism Panic 🎮
+# Prism Panic
 
-A cyberpunk-themed memory match flash card game built with vanilla HTML5 Canvas and JavaScript.
+A memory match flash card game built with HTML5 Canvas and vanilla JavaScript.
 
-## Gameplay
+## Overview
 
-Match all 6 pairs of colored shapes before the 5-minute timer runs out! Each card displays a unique combination of shape and color. Flip cards using mouse, touch, or keyboard controls.
+**Prism Panic** challenges players to find all 8 matching pairs of colored shapes on a 4×4 grid of flash cards before the 5-minute timer runs out. Each card features a unique shape and color combination from the Arne16 color palette.
 
-### Shapes
-- Circle • Square • Triangle • Star • Heart • Diamond
+## How to Play
 
-### How to Play
-1. Start at the title screen by clicking, tapping, or pressing any key
-2. Study the cards during the 3-second preview phase
-3. Flip two cards at a time to find matching pairs
-4. Matched pairs stay face-up; mismatches flip back with a miss penalty
-5. Clear all 6 pairs before time runs out to win!
+1. Open `index.html` in a web browser.
+2. Press any key, click, or tap to start from the title screen.
+3. Study all 16 cards for 3 seconds — they flip face down automatically.
+4. Flip cards one at a time by tapping/clicking or using keyboard controls.
+5. Match pairs of identical shape + color to clear them.
+6. Beat the clock! Every remaining second counts toward your score.
 
-### Controls
+## Controls
 
-| Input | Action |
-|-------|--------|
-| **Mouse/Touch** | Click or tap a card to flip it |
-| **Arrow Keys** | Navigate the card selector |
-| **Enter / Space** | Flip the selected card |
+### Mouse / Touch
+- **Click / Tap** a card to flip it
 
-### Scoring
+### Keyboard
+- **Arrow Keys** — Move the selection cursor across the grid
+- **Enter** — Flip the selected card
 
-```
-Score = (Remaining Seconds × 5) - (Misses × 50)
-Minimum score on a win: 1 point
-```
+## Scoring
 
-- **Remaining time bonus**: Each second left is worth 5 points
-- **Miss penalty**: Each wrong pair costs 50 points
-- Even with zero or negative calculated points, a win awards at least 1 point
+- **Base points**: Remaining seconds × 5
+- **Penalty**: −50 points per missed pair
+- **Minimum win score**: 1 point (if total falls to 0 or below, you still get 1)
 
-## Color Scheme
+### Example
+- Finish with 120 seconds left, 2 misses: `120 × 5 − (2 × 50) = 400 points`
+- Finish with 10 seconds left, 7 misses: `10 × 5 − (7 × 50) = −300` → **1 point**
 
-Built using the **Arne16** monochrome-inspired palette:
+## Game Rules
 
-| Hex | Role |
-|-----|------|
-| `#000000` | Background (black) |
-| `#1B2632` | Deep panels (dark navy) |
-| `#9D9D9D` | Text accents (gray) |
-| `#FFFFFF` | Highlights (white) |
-| `#BE2633` | Card color 1 (crimson) |
-| `#E06F8B` | Card color 2 (pink) |
-| `#493C2B` | UI elements (brown) |
-| `#A46422` | UI elements (bronze) |
-| `#EB8931` | Card color 3 (orange) |
-| `#F7E26B` | Card color 4 (gold) |
-| `#2F484E` | UI elements (slate) |
-| `#44891A` | UI elements (forest) |
-| `#A3CE27` | Card color 5 (lime) |
-| `#005784` | UI elements (ocean) |
-| `#31A2F2` | Card color 6 (sky) |
-| `#B2DCFF` | Glows (ice) |
+- **Cards**: 16 cards (8 pairs) in a 4×4 grid
+- **Shapes**: Circle, Square, Triangle, Star, Heart, Diamond, Pentagon, Hexagon
+- **Colors**: Each pair has a unique color from the Arne16 palette (no color repeats)
+- **Time limit**: 5 minutes (300 seconds)
+- **Win**: Match all 8 pairs before time runs out
+- **Lose**: Timer reaches zero before all pairs are matched
 
-## File Structure
+## Technology
 
-```
-ppanic/
-├── README.md    # This file
-├── index.html   # Game shell and styles
-└── game.js      # All game logic and rendering
-```
+- HTML5 Canvas rendering
+- Vanilla JavaScript (no external libraries)
+- Arne16 color scheme throughout
+- Responsive square canvas that scales to fit any browser window
+- Mobile-friendly touch controls
 
-## Requirements
-
-- Any modern browser with HTML5 Canvas support
-- No external libraries or dependencies
-- Works on desktop and mobile
-
-## License
-
-Free to use, modify, and distribute.
