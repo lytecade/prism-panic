@@ -1,912 +1,1011 @@
-// Prism Panic - Cyberpunk Memory Match Game (Refactored)
-// Fixed Alignment, Layout Logic, and Title Screen separation
+// ============================================================
+// Prism Panic — Cyberpunk Memory Match Game
+// Vanilla HTML5 Canvas, no external libraries
+// ============================================================
 
-(function () {
-    "use strict";
+(() => {
+  "use strict";
 
-    // ─── Arne16 Color Palette ────────────────────────────────────
-    const C = {
-        black:      "#000000",
-        gray:       "#9D9D9D",
-        white:      "#FFFFFF",
-        crimson:    "#BE2633",
-        pink:       "#E06F8B",
-        brown:      "#493C2B",
-        bronze:     "#A46422",
-        orange:     "#EB8931",
-        gold:       "#F7E26B",
-        slate:      "#2F484E",
-        forest:     "#44891A",
-        lime:       "#A3CE27",
-        navy:       "#1B2632",
-        ocean:      "#005784",
-        sky:        "#31A2F2",
-        ice:        "#B2DCFF"
-    };
+  // ── Arne16 Palette ──────────────────────────────────────
+  const ARNE = {
+    BLACK:      "#000000",
+    GRAY:       "#9D9D9D",
+    WHITE:      "#FFFFFF",
+    RED:        "#BE2633",
+    PINK:       "#E06F8B",
+    BROWN:      "#493C2B",
+    DARK_ORANGE:"#A46422",
+    ORANGE:     "#EB8931",
+    YELLOW:     "#F7E26B",
+    DARK_TEAL:  "#2F484E",
+    GREEN:      "#44891A",
+    LIME:       "#A3CE27",
+    DARK_NAVY:  "#1B2632",
+    BLUE:       "#005784",
+    LIGHT_BLUE: "#31A2F2",
+    LIGHT_CYAN: "#B2DCEF",
+  };
 
-    const CARD_COLORS = [C.crimson, C.orange, C.gold, C.lime, C.sky, C.pink, C.bronze, C.forest];
-    const SHAPES = ["Circle", "Square", "Triangle", "Star", "Heart", "Diamond", "Pentagon", "Hexagon"];
-    const TOTAL_PAIRS = SHAPES.length; // 8
-    const COLS = 4;
-    const ROWS = 4;
+  const ARNE_ARRAY = Object.values(ARNE);
 
-    // ─── Game Constants ──────────────────────────────────────────
-    // Increased width slightly (800x640) to accommodate 4x4 grid better without crowding
-    const INTERNAL_W = 800;
-    const INTERNAL_H = 640; 
-    
-    const TOTAL_TIME = 300; // 5 minutes
-    const PREVIEW_TIME = 3; // 3 seconds
-    const FLIP_DURATION = 300; // ms for flip animation
+  // ── Shapes (8 unique) ───────────────────────────────────
+  const SHAPES = [
+    "circle", "square", "triangle", "star",
+    "heart", "diamond", "pentagon", "hexagon"
+  ];
 
-    // Layout Boundaries for Title Screen
-    const TITLE_TOP = 100;
-    const TITLE_BOTTOM = 540;
+  // Colors used for card pairs (8 distinct, from Arne16 minus neutrals)
+  const PAIR_COLORS = [
+    ARNE.RED, ARNE.PINK, ARNE.ORANGE, ARNE.YELLOW,
+    ARNE.GREEN, ARNE.LIGHT_BLUE, ARNE.LIME, ARNE.DARK_ORANGE
+  ];
 
-    // ─── Game States ─────────────────────────────────────────────
-    const STATE = {
-        TITLE: "title",
-        PREVIEW: "preview",
-        PLAYING: "playing",
-        WIN: "win",
-        LOSE: "lose"
-    };
+  // ── Game States ─────────────────────────────────────────
+  const STATE = {
+    TITLE:    "title",
+    PREVIEW:  "preview",
+    PLAYING:  "playing",
+    WIN:      "win",
+    LOSE:     "lose",
+  };
 
-    // ─── Canvas Setup ────────────────────────────────────────────
-    const canvas = document.getElementById("gameCanvas");
-    const ctx = canvas.getContext("2d");
-    canvas.width = INTERNAL_W;
-    canvas.height = INTERNAL_H;
+  // ── Constants ───────────────────────────────────────────
+  const GRID_COLS = 4;
+  const GRID_ROWS = 4;
+  const TOTAL_PAIRS = 8;
+  const TIME_LIMIT = 300;        // 5 minutes in seconds
+  const PREVIEW_TIME = 3000;     // 3 seconds preview
+  const FLIP_DURATION = 300;     // flip animation ms
+  const MISS_PENALTY = 50;
+  const POINTS_PER_SECOND = 5;
 
-    // ─── Game State Variables ────────────────────────────────────
-    let gameState = STATE.TITLE;
-    let cards = [];
-    let flippedCards = [];
-    let matchedPairs = 0;
-    let misses = 0;
-    let timer = TOTAL_TIME;
-    let lastTime = 0;
-    let previewTimer = PREVIEW_TIME;
-    
-    // Input selection state
-    let selectorRow = 0;
-    let selectorCol = 0;
-    
-    // Animation/Visual vars
-    let titlePulse = 0;
-    let scanlineOffset = 0;
-    let particles = [];
-    let flipAnimations = [];
-    let canInteract = true;
-    let shakeTimer = 0;
-    let shakeIntensity = 0;
-    let winGlow = 0;
-    let loseGlow = 0;
-    let matchFlashTimer = 0;
+  // ── Canvas Setup ────────────────────────────────────────
+  const canvas = document.getElementById("game");
+  const ctx = canvas.getContext("2d");
 
-    // ─── Resize Handler ──────────────────────────────────────────
-    function resize() {
-        const winW = window.innerWidth;
-        const winH = window.innerHeight;
-        const scale = Math.min(winW / INTERNAL_W, winH / INTERNAL_H);
-        canvas.style.width = (INTERNAL_W * scale) + "px";
-        canvas.style.height = (INTERNAL_H * scale) + "px";
+  // Base size (square) — large enough for clean layout
+  const BASE = 700;
+  let scale = 1;
+  let offsetX = 0;
+  let offsetY = 0;
+
+  function resize() {
+    const ww = window.innerWidth;
+    const wh = window.innerHeight;
+    const dpr = window.devicePixelRatio || 1;
+    const size = Math.min(ww, wh);
+    canvas.style.width = size + "px";
+    canvas.style.height = size + "px";
+    canvas.width = size * dpr;
+    canvas.height = size * dpr;
+    scale = (size * dpr) / BASE;
+    ctx.setTransform(scale, 0, 0, scale, 0, 0);
+  }
+  window.addEventListener("resize", resize);
+  resize();
+
+  // ── Layout Metrics ──────────────────────────────────────
+  const MARGIN = 30;
+  const HUD_H = 50;
+  const BOARD_TOP = MARGIN + HUD_H + 10;
+  const BOARD_SIZE = BASE - 2 * MARGIN - HUD_H - 10;
+  const CARD_GAP = 10;
+  const CARD_W = (BOARD_SIZE - CARD_GAP * (GRID_COLS - 1)) / GRID_COLS;
+  const CARD_H = CARD_W;
+  const CARD_RADIUS = 12;
+
+  function cardX(col) { return MARGIN + col * (CARD_W + CARD_GAP); }
+  function cardY(row) { return BOARD_TOP + row * (CARD_H + CARD_GAP); }
+
+  // ── Game State ──────────────────────────────────────────
+  let gState = STATE.TITLE;
+  let cards = [];          // {shape, color, matched, flipped, row, col}
+  let timer = TIME_LIMIT;
+  let timerAccum = 0;
+  let misses = 0;
+  let flippedCards = [];   // currently face-up (non-matched)
+  let locked = false;      // input lock during animations
+  let previewEnd = 0;
+  let animating = false;
+  let animStart = 0;
+  let animType = "";       // "flipUp" | "flipDown" | "revealMatch"
+  let animTargets = [];
+  let selectRow = 0;
+  let selectCol = 0;
+  let score = 0;
+  let particles = [];
+
+  // ── Card Initialization ─────────────────────────────────
+  function initCards() {
+    cards = [];
+    const pairs = [];
+    for (let i = 0; i < TOTAL_PAIRS; i++) {
+      pairs.push({ shape: SHAPES[i], color: PAIR_COLORS[i] });
+      pairs.push({ shape: SHAPES[i], color: PAIR_COLORS[i] });
     }
-    window.addEventListener("resize", resize);
-    resize();
+    // Fisher-Yates shuffle
+    for (let i = pairs.length - 1; i > 0; i--) {
+      const j = Math.floor(Math.random() * (i + 1));
+      [pairs[i], pairs[j]] = [pairs[j], pairs[i]];
+    }
+    let idx = 0;
+    for (let r = 0; r < GRID_ROWS; r++) {
+      for (let c = 0; c < GRID_COLS; c++) {
+        cards.push({
+          shape: pairs[idx].shape,
+          color: pairs[idx].color,
+          matched: false,
+          flipped: false,
+          row: r,
+          col: c,
+          flipProgress: 0, // 0 = face down, 1 = face up
+        });
+        idx++;
+      }
+    }
+  }
 
-    // ─── Utility Functions ───────────────────────────────────────
-    function lerp(a, b, t) { return a + (b - a) * t; }
-    function clamp(v, min, max) { return Math.max(min, Math.min(max, v)); }
-    function easeInOut(t) { return t < 0.5 ? 4*t*t*t : 1-Math.pow(-2*t+2,3)/2; }
+  // ── Start Game ──────────────────────────────────────────
+  function startGame() {
+    gState = STATE.PREVIEW;
+    initCards();
+    timer = TIME_LIMIT;
+    timerAccum = 0;
+    misses = 0;
+    flippedCards = [];
+    locked = false;
+    animating = false;
+    selectRow = 0;
+    selectCol = 0;
+    particles = [];
+    // All cards face up during preview
+    for (const card of cards) {
+      card.flipped = true;
+      card.flipProgress = 1;
+    }
+    previewEnd = performance.now() + PREVIEW_TIME;
+  }
 
-    function shuffle(arr) {
-        for (let i = arr.length - 1; i > 0; i--) {
-            const j = Math.floor(Math.random() * (i + 1));
-            [arr[i], arr[j]] = [arr[j], arr[i]];
+  // ── Flip Card Helper ────────────────────────────────────
+  function flipCard(card, direction) {
+    // direction: 1 = face up, -1 = face down
+    const target = direction > 0 ? 1 : 0;
+    card._flipTarget = target;
+  }
+
+  // ── Handle Card Selection ───────────────────────────────
+  function selectCard(row, col) {
+    if (gState !== STATE.PLAYING) return;
+    if (locked || animating) return;
+    const card = cards.find(c => c.row === row && c.col === col);
+    if (!card) return;
+    if (card.matched) return;
+    if (card.flipProgress >= 0.5) return; // already face-up
+
+    // Flip this card face up
+    card._flipTarget = 1;
+    animating = true;
+
+    if (flippedCards.length === 0) {
+      // First card flipped — allow next pick after animation
+      flippedCards.push(card);
+      setTimeout(() => {
+        animating = false;
+      }, FLIP_DURATION);
+    } else if (flippedCards.length === 1) {
+      // Second card flipped — check match after animation
+      const first = flippedCards[0];
+      animating = true;
+
+      setTimeout(() => {
+        if (first.shape === card.shape && first.color === card.color) {
+          // Match!
+          locked = true;
+          first.matched = true;
+          card.matched = true;
+          first.flipProgress = 1;
+          first.flipped = true;
+          card.flipProgress = 1;
+          card.flipped = true;
+          first._flipTarget = undefined;
+          card._flipTarget = undefined;
+          animating = false;
+          flippedCards = [];
+          spawnMatchParticles(card);
+          spawnMatchParticles(first);
+          // Check win
+          if (cards.every(c => c.matched)) {
+            score = Math.max(1, Math.floor(timer) * POINTS_PER_SECOND - misses * MISS_PENALTY);
+            gState = STATE.WIN;
+          }
+          locked = false;
+        } else {
+          // Mismatch
+          misses++;
+          // Flip both back
+          first._flipTarget = 0;
+          card._flipTarget = 0;
+          setTimeout(() => {
+            animating = false;
+            flippedCards = [];
+            locked = false;
+          }, FLIP_DURATION + 50);
         }
-        return arr;
+      }, FLIP_DURATION);
+    } else {
+      animating = false;
     }
+  }
 
-    // ─── Card Geometry & Layout (FIXED) ──────────────────────────
-    function getCardLayout() {
-        // Define safe zones to prevent overlap
-        const topMargin = 60; // Space for HUD
-        const bottomMargin = 30;
-        const sideMargin = 40; // Left/Right padding
-        
-        const availW = INTERNAL_W - (sideMargin * 2);
-        const availH = INTERNAL_H - topMargin - bottomMargin;
-        
-        const cardGap = 15; // Increased gap slightly for breathing room
-        
-        // Calculate max possible card size based on Height
-        const sizeByH = Math.floor((availH - (cardGap * (ROWS - 1))) / ROWS);
-        // Calculate max possible card size based on Width
-        const sizeByW = Math.floor((availW - (cardGap * (COLS - 1))) / COLS);
-        
-        // Take the smaller of the two to ensure it fits both dimensions
-        const cardSize = Math.min(sizeByH, sizeByW);
-
-        // Center the grid in the available space
-        const gridW = (cardSize * COLS) + (cardGap * (COLS - 1));
-        const gridH = (cardSize * ROWS) + (cardGap * (ROWS - 1));
-        
-        const startX = sideMargin + (availW - gridW) / 2;
-        const startY = topMargin + (availH - gridH) / 2;
-        
-        // Corner radius based on card size
-        const radius = Math.max(8, cardSize * 0.1);
-
-        return { cardW: cardSize, cardH: cardSize, startX, startY, cardGap, topMargin, radius };
+  // ── Particles ───────────────────────────────────────────
+  function spawnMatchParticles(card) {
+    const cx = cardX(card.col) + CARD_W / 2;
+    const cy = cardY(card.row) + CARD_H / 2;
+    for (let i = 0; i < 12; i++) {
+      const angle = (Math.PI * 2 / 12) * i + Math.random() * 0.5;
+      const speed = 1.5 + Math.random() * 2.5;
+      particles.push({
+        x: cx, y: cy,
+        vx: Math.cos(angle) * speed,
+        vy: Math.sin(angle) * speed,
+        life: 1,
+        decay: 0.015 + Math.random() * 0.015,
+        color: card.color,
+        size: 3 + Math.random() * 4,
+      });
     }
+  }
 
-    function getCardPos(row, col, layout) {
-        return {
-            x: layout.startX + col * (layout.cardW + layout.cardGap),
-            y: layout.startY + row * (layout.cardH + layout.cardGap)
-        };
+  function updateParticles() {
+    for (let i = particles.length - 1; i >= 0; i--) {
+      const p = particles[i];
+      p.x += p.vx;
+      p.y += p.vy;
+      p.life -= p.decay;
+      if (p.life <= 0) particles.splice(i, 1);
     }
+  }
 
-    // ─── Card Creation ──────────────────────────────────────────
-    function createCards() {
-        cards = [];
-        // Create pairs
-        for (let i = 0; i < SHAPES.length; i++) {
-            cards.push({ shape: SHAPES[i], color: CARD_COLORS[i], matched: false, faceUp: false });
-            cards.push({ shape: SHAPES[i], color: CARD_COLORS[i], matched: false, faceUp: false });
-        }
-        shuffle(cards);
+  function drawParticles() {
+    for (const p of particles) {
+      ctx.globalAlpha = p.life;
+      ctx.fillStyle = p.color;
+      ctx.fillRect(p.x - p.size / 2, p.y - p.size / 2, p.size, p.size);
     }
+    ctx.globalAlpha = 1;
+  }
 
-    // ─── Drawing Functions ───────────────────────────────────────
+  // ── Drawing Helpers ─────────────────────────────────────
+  function drawRoundedRect(x, y, w, h, r) {
+    ctx.beginPath();
+    ctx.moveTo(x + r, y);
+    ctx.lineTo(x + w - r, y);
+    ctx.quadraticCurveTo(x + w, y, x + w, y + r);
+    ctx.lineTo(x + w, y + h - r);
+    ctx.quadraticCurveTo(x + w, y + h, x + w - r, y + h);
+    ctx.lineTo(x + r, y + h);
+    ctx.quadraticCurveTo(x, y + h, x, y + h - r);
+    ctx.lineTo(x, y + r);
+    ctx.quadraticCurveTo(x, y, x + r, y);
+    ctx.closePath();
+  }
 
-    function drawBackground() {
-        // Dark gradient background
-        const grad = ctx.createRadialGradient(
-            INTERNAL_W / 2, INTERNAL_H / 2, 0,
-            INTERNAL_W / 2, INTERNAL_H / 2, INTERNAL_W * 0.8
-        );
-        grad.addColorStop(0, C.navy);
-        grad.addColorStop(1, C.black);
-        ctx.fillStyle = grad;
-        ctx.fillRect(0, 0, INTERNAL_W, INTERNAL_H);
+  function drawShape(shape, cx, cy, size, color) {
+    ctx.fillStyle = color;
+    ctx.strokeStyle = color;
+    ctx.lineWidth = 2;
+    ctx.lineJoin = "round";
 
-        // Cyberpunk Grid
-        ctx.strokeStyle = C.ocean;
-        ctx.globalAlpha = 0.15;
-        ctx.lineWidth = 1;
-        const gridSize = 40;
-        for (let x = 0; x < INTERNAL_W; x += gridSize) {
-            ctx.beginPath();
-            ctx.moveTo(x, 0);
-            ctx.lineTo(x, INTERNAL_H);
-            ctx.stroke();
-        }
-        for (let y = 0; y < INTERNAL_H; y += gridSize) {
-            ctx.beginPath();
-            ctx.moveTo(0, y);
-            ctx.lineTo(INTERNAL_W, y);
-            ctx.stroke();
-        }
-        ctx.globalAlpha = 1;
-    }
-
-    function drawScanlines() {
-        scanlineOffset = (scanlineOffset + 0.5) % 4;
-        ctx.fillStyle = C.black;
-        ctx.globalAlpha = 0.1;
-        for (let y = scanlineOffset; y < INTERNAL_H; y += 4) {
-            ctx.fillRect(0, y, INTERNAL_W, 1);
-        }
-        ctx.globalAlpha = 1;
-    }
-
-    // ─── Shape Drawing Helpers ──────────────────────────────────
-    function drawCardShape(cx, cy, size, shape, color) {
-        const s = size * 0.5;
-        ctx.save();
-        ctx.shadowColor = color;
-        ctx.shadowBlur = 15;
-        ctx.fillStyle = color;
-        ctx.strokeStyle = color;
-        ctx.lineWidth = 3;
-        ctx.lineJoin = "round";
-
-        switch (shape) {
-            case "Circle":
-                ctx.beginPath(); ctx.arc(cx, cy, s * 0.45, 0, Math.PI * 2); ctx.fill(); break;
-            case "Square":
-                ctx.beginPath(); ctx.rect(cx - s*0.4, cy - s*0.4, s*0.8, s*0.8); ctx.fill(); break;
-            case "Triangle":
-                ctx.beginPath();
-                ctx.moveTo(cx, cy - s * 0.45);
-                ctx.lineTo(cx + s * 0.45, cy + s * 0.35);
-                ctx.lineTo(cx - s * 0.45, cy + s * 0.35);
-                ctx.closePath(); ctx.fill(); break;
-            case "Star":
-                // Draw Star
-                ctx.beginPath();
-                for(let i=0; i<10; i++){
-                    const r = (i%2 === 0) ? s*0.48 : s*0.22;
-                    const angle = (Math.PI/5)*i - Math.PI/2;
-                    const x = cx + Math.cos(angle)*r;
-                    const y = cy + Math.sin(angle)*r;
-                    i===0 ? ctx.moveTo(x,y) : ctx.lineTo(x,y);
-                }
-                ctx.closePath(); ctx.fill(); break;
-            case "Heart":
-                // Draw Heart
-                const hs = s * 0.4;
-                ctx.beginPath();
-                ctx.moveTo(cx, cy + hs*0.8);
-                ctx.bezierCurveTo(cx-hs*1.5, cy-hs, cx-hs*1.5, cy-hs*1.5, cx, cy-hs*0.5);
-                ctx.bezierCurveTo(cx+hs*1.5, cy-hs*1.5, cx+hs*1.5, cy-hs, cx, cy+hs*0.8);
-                ctx.closePath(); ctx.fill(); break;
-            case "Diamond":
-                ctx.beginPath();
-                ctx.moveTo(cx, cy - s * 0.48);
-                ctx.lineTo(cx + s * 0.35, cy);
-                ctx.lineTo(cx, cy + s * 0.48);
-                ctx.lineTo(cx - s * 0.35, cy);
-                ctx.closePath(); ctx.fill(); break;
-            case "Pentagon":
-            case "Hexagon":
-                const sides = shape === "Pentagon" ? 5 : 6;
-                ctx.beginPath();
-                for (let i = 0; i < sides; i++) {
-                    const angle = (Math.PI * 2 / sides) * i - Math.PI / 2;
-                    ctx.lineTo(cx + Math.cos(angle) * s * 0.45, cy + Math.sin(angle) * s * 0.45);
-                }
-                ctx.closePath(); ctx.fill(); break;
-        }
-        ctx.restore();
-    }
-
-    function drawCardBack(cx, cy, w, h, radius) {
-        ctx.fillStyle = C.slate;
-        roundRect(cx - w/2, cy - h/2, w, h, radius);
-        ctx.fill();
-
-        ctx.strokeStyle = C.ocean;
-        ctx.lineWidth = 2;
-        roundRect(cx - w/2, cy - h/2, w, h, radius);
-        ctx.stroke();
-
-        // Inner design
-        ctx.save();
-        ctx.globalAlpha = 0.3;
-        ctx.fillStyle = C.sky;
-        ctx.font = `bold ${Math.floor(w * 0.15)}px monospace`;
-        ctx.textAlign = "center";
-        ctx.textBaseline = "middle";
-        ctx.fillText("PRISM", cx, cy);
-        ctx.restore();
-    }
-
-    function drawCardFront(cx, cy, w, h, radius, shape, color) {
-        const grad = ctx.createLinearGradient(cx - w/2, cy - h/2, cx + w/2, cy + h/2);
-        grad.addColorStop(0, C.navy);
-        grad.addColorStop(1, "#0D1B2A");
-        ctx.fillStyle = grad;
-        roundRect(cx - w/2, cy - h/2, w, h, radius);
-        ctx.fill();
-
-        ctx.save();
-        ctx.shadowColor = color;
-        ctx.shadowBlur = 10;
-        ctx.strokeStyle = color;
-        ctx.lineWidth = 2;
-        roundRect(cx - w/2, cy - h/2, w, h, radius);
-        ctx.stroke();
-        ctx.restore();
-
-        drawCardShape(cx, cy, w, shape, color);
-    }
-
-    function drawMatchedCard(cx, cy, w, h, radius, shape, color) {
-        ctx.save();
-        ctx.globalAlpha = 0.5;
-        drawCardFront(cx, cy, w, h, radius, shape, color);
-        ctx.restore();
-
-        // Checkmark
-        ctx.save();
-        ctx.strokeStyle = C.lime;
-        ctx.lineWidth = 4;
-        ctx.lineCap = "round";
+    switch (shape) {
+      case "circle":
         ctx.beginPath();
-        ctx.moveTo(cx - w*0.2, cy);
-        ctx.lineTo(cx - w*0.05, cy + w*0.15);
-        ctx.lineTo(cx + w*0.25, cy - w*0.15);
-        ctx.stroke();
-        ctx.restore();
-    }
+        ctx.arc(cx, cy, size, 0, Math.PI * 2);
+        ctx.fill();
+        break;
 
-    function roundRect(x, y, w, h, r) {
+      case "square":
+        ctx.fillRect(cx - size, cy - size, size * 2, size * 2);
+        break;
+
+      case "triangle":
         ctx.beginPath();
-        ctx.moveTo(x + r, y);
-        ctx.lineTo(x + w - r, y);
-        ctx.quadraticCurveTo(x + w, y, x + w, y + r);
-        ctx.lineTo(x + w, y + h - r);
-        ctx.quadraticCurveTo(x + w, y + h, x + w - r, y + h);
-        ctx.lineTo(x + r, y + h);
-        ctx.quadraticCurveTo(x, y + h, x, y + h - r);
-        ctx.lineTo(x, y + r);
-        ctx.quadraticCurveTo(x, y, x + r, y);
+        ctx.moveTo(cx, cy - size * 1.1);
+        ctx.lineTo(cx + size * 1.1, cy + size * 0.85);
+        ctx.lineTo(cx - size * 1.1, cy + size * 0.85);
         ctx.closePath();
+        ctx.fill();
+        break;
+
+      case "star":
+        drawStar(cx, cy, 5, size * 1.2, size * 0.5);
+        break;
+
+      case "heart":
+        drawHeart(cx, cy, size * 1.1);
+        break;
+
+      case "diamond":
+        ctx.beginPath();
+        ctx.moveTo(cx, cy - size * 1.2);
+        ctx.lineTo(cx + size * 0.8, cy);
+        ctx.lineTo(cx, cy + size * 1.2);
+        ctx.lineTo(cx - size * 0.8, cy);
+        ctx.closePath();
+        ctx.fill();
+        break;
+
+      case "pentagon":
+        drawPolygon(cx, cy, 5, size * 1.2);
+        break;
+
+      case "hexagon":
+        drawPolygon(cx, cy, 6, size * 1.2);
+        break;
     }
+  }
 
-    // ─── HUD Drawing ───────────────────────────────────────────
-    function drawHUD(layout) {
-        // Timer
-        const mins = Math.floor(timer / 60);
-        const secs = Math.floor(timer % 60);
-        const timeStr = `${mins}:${secs.toString().padStart(2, "0")}`;
-
-        ctx.save();
-        ctx.font = "bold 24px monospace";
-        ctx.textAlign = "left";
-        ctx.textBaseline = "top";
-        
-        let color = C.ice;
-        if(timer <= 30) color = C.crimson;
-        
-        ctx.shadowColor = color;
-        ctx.shadowBlur = 8;
-        ctx.fillStyle = color;
-        ctx.fillText(`⏱ ${timeStr}`, 20, 15);
-        ctx.restore();
-
-        // Pairs
-        ctx.save();
-        ctx.font = "bold 20px monospace";
-        ctx.textAlign = "right";
-        ctx.fillStyle = C.lime;
-        ctx.shadowColor = C.lime;
-        ctx.shadowBlur = 5;
-        ctx.fillText(`${matchedPairs}/${TOTAL_PAIRS}`, INTERNAL_W - 20, 20);
-        ctx.restore();
-
-        // Misses
-        ctx.save();
-        ctx.textAlign = "center";
-        ctx.fillStyle = C.orange;
-        ctx.shadowColor = C.orange;
-        ctx.fillText(`Misses: ${misses}`, INTERNAL_W / 2, 20);
-        ctx.restore();
+  function drawStar(cx, cy, points, outerR, innerR) {
+    ctx.beginPath();
+    for (let i = 0; i < points * 2; i++) {
+      const r = i % 2 === 0 ? outerR : innerR;
+      const angle = (Math.PI / points) * i - Math.PI / 2;
+      const x = cx + Math.cos(angle) * r;
+      const y = cy + Math.sin(angle) * r;
+      if (i === 0) ctx.moveTo(x, y);
+      else ctx.lineTo(x, y);
     }
+    ctx.closePath();
+    ctx.fill();
+  }
 
-    // ─── Title Screen (FIXED - Dedicated Area) ─────────────────
-    function drawTitleScreen(dt) {
-        drawBackground();
-        drawScanlines();
+  function drawHeart(cx, cy, size) {
+    ctx.beginPath();
+    const s = size * 0.55;
+    ctx.moveTo(cx, cy + s * 0.8);
+    ctx.bezierCurveTo(cx - s * 2, cy - s * 0.5, cx - s, cy - s * 2, cx, cy - s * 0.7);
+    ctx.bezierCurveTo(cx + s, cy - s * 2, cx + s * 2, cy - s * 0.5, cx, cy + s * 0.8);
+    ctx.closePath();
+    ctx.fill();
+  }
 
-        const cx = INTERNAL_W / 2;
-        const cy = INTERNAL_H / 2; // Center of the screen
-
-        // Title Glow
-        titlePulse += dt * 2;
-        const pulse = Math.sin(titlePulse) * 0.3 + 0.7;
-
-        ctx.save();
-        ctx.textAlign = "center";
-        ctx.textBaseline = "middle";
-
-        // PRISM
-        ctx.shadowColor = C.sky;
-        ctx.shadowBlur = 20 * pulse;
-        ctx.fillStyle = C.ice;
-        ctx.font = "bold 80px monospace";
-        ctx.fillText("PRISM", cx, cy - 60);
-
-        // PANIC
-        ctx.shadowColor = C.crimson;
-        ctx.shadowBlur = 20 * pulse;
-        ctx.fillStyle = C.crimson;
-        ctx.font = "bold 50px monospace";
-        ctx.fillText("PANIC", cx, cy + 20);
-
-        // Instructions
-        ctx.font = "18px monospace";
-        ctx.fillStyle = C.gray;
-        ctx.shadowBlur = 0;
-        ctx.fillText("MATCH THE CYBER-SHAPES", cx, cy + 80);
-
-        // Start Prompt
-        const blink = Math.sin(Date.now() / 300) * 0.4 + 0.6;
-        ctx.font = "bold 22px monospace";
-        ctx.fillStyle = C.white;
-        ctx.globalAlpha = blink;
-        ctx.fillText("[ CLICK OR PRESS SPACE TO START ]", cx, cy + 150);
-
-        ctx.restore();
+  function drawPolygon(cx, cy, sides, radius) {
+    ctx.beginPath();
+    for (let i = 0; i < sides; i++) {
+      const angle = (Math.PI * 2 / sides) * i - Math.PI / 2;
+      const x = cx + Math.cos(angle) * radius;
+      const y = cy + Math.sin(angle) * radius;
+      if (i === 0) ctx.moveTo(x, y);
+      else ctx.lineTo(x, y);
     }
+    ctx.closePath();
+    ctx.fill();
+  }
 
-    // ─── Game Board (FIXED - Proper Z-Index & Sizing) ─────────
-    function drawGameBoard(dt) {
-        const layout = getCardLayout();
+  // ── Draw Card ───────────────────────────────────────────
+  function drawCard(card) {
+    const x = cardX(card.col);
+    const y = cardY(card.row);
 
-        // 1. Draw Background
-        drawBackground();
+    // flipProgress: 0 = face down, 1 = face up
+    // Visual threshold at 0.5
+    const progress = card.flipProgress;
+    const faceUp = progress >= 0.5;
 
-        // 2. Draw HUD (Top Layer)
-        drawHUD(layout);
-
-        // 3. Draw Flip Animations & Cards
-        updateFlipAnimations(dt);
-
-        cards.forEach((card, i) => {
-            const pos = getCardPos(i % COLS, Math.floor(i / COLS), layout);
-            const cx = pos.x;
-            const cy = pos.y;
-            const w = layout.cardW;
-            const h = layout.cardH;
-            const r = layout.radius;
-
-            const anim = flipAnimations.find(a => a.cardIndex === i && !a.done);
-
-            // If animating
-            if (anim) {
-                drawAnimatedCard(cx, cy, w, h, r, card, anim);
-            } 
-            // Normal State
-            else {
-                if (card.matched) {
-                    drawMatchedCard(cx, cy, w, h, r, card.shape, card.color);
-                } else if (card.faceUp || gameState === STATE.PREVIEW) {
-                    drawCardFront(cx, cy, w, h, r, card.shape, card.color);
-                } else {
-                    drawCardBack(cx, cy, w, h, r);
-                }
-            }
-        });
-
-        // 4. Match Flash Effect
-        if (matchFlashTimer > 0) {
-            ctx.save();
-            ctx.fillStyle = C.white;
-            ctx.globalAlpha = matchFlashTimer * 0.2;
-            ctx.fillRect(0, 0, INTERNAL_W, INTERNAL_H);
-            ctx.restore();
-        }
-
-        // 5. Selection Selector
-        if (gameState === STATE.PLAYING && canInteract) {
-            drawSelector(layout);
-        }
-
-        drawScanlines();
-        drawParticles();
-    }
-
-    function drawAnimatedCard(cx, cy, w, h, r, card, anim) {
-        const progress = easeInOut(anim.progress);
-        
-        ctx.save();
-        // Use scaleX to simulate flip
-        const scaleX = anim.direction === "flipIn" ? 1 - (2*progress) : (2*progress) - 1;
-        
-        if (Math.abs(scaleX) < 0.05) scaleX = 0; // Hide exactly when turning
-
-        ctx.translate(cx, cy);
-        ctx.scale(scaleX, 1);
-        ctx.translate(-cx, -cy);
-
-        // When facing away (scaleX < 0) show back, else show front
-        if (scaleX < 0) {
-             // We are essentially looking at the back while flipping
-             // But for this simple 2D flip, we just toggle face immediately 
-             // or draw the reverse side. 
-             // Simplest approach: Draw Front when flipping IN, Back when flipping OUT
-             if(anim.direction === "flipIn") {
-                 // Currently facing away from user (simulated)
-                 drawCardBack(cx, cy, w, h, r); 
-             } else {
-                 drawCardFront(cx, cy, w, h, r, card.shape, card.color);
-             }
-        } else {
-            // Facing user
-            if(anim.direction === "flipIn") {
-                drawCardFront(cx, cy, w, h, r, card.shape, card.color);
-            } else {
-                drawCardBack(cx, cy, w, h, r);
-            }
-        }
-        ctx.restore();
-    }
-
-    function drawSelector(layout) {
-        const pos = getCardPos(selectorRow, selectorCol, layout);
-        const cx = pos.x;
-        const cy = pos.y;
-        const w = layout.cardW;
-        const h = layout.cardH;
-        const r = layout.radius + 4;
-
-        ctx.save();
-        const pulse = Math.sin(Date.now() / 300) * 0.3 + 0.7;
-        ctx.globalAlpha = pulse;
-        ctx.shadowColor = C.ice;
-        ctx.shadowBlur = 15;
-        ctx.strokeStyle = C.ice;
+    if (faceUp) {
+      // Fully face up
+      // Card background
+      drawRoundedRect(x, y, CARD_W, CARD_H, CARD_RADIUS);
+      if (card.matched) {
+        ctx.fillStyle = "#0a1a2a";
+        ctx.fill();
+        ctx.strokeStyle = card.color;
         ctx.lineWidth = 3;
-        roundRect(cx - w/2 - 4, cy - h/2 - 4, w + 8, h + 8, r);
         ctx.stroke();
-        ctx.restore();
-    }
-
-    // ─── Particles ───────────────────────────────────────────────
-    function spawnMatchParticles(cx, cy, color) {
-        for (let i = 0; i < 15; i++) {
-            const angle = Math.random() * Math.PI * 2;
-            const speed = 2 + Math.random() * 3;
-            particles.push({
-                x: cx, y: cy,
-                vx: Math.cos(angle) * speed,
-                vy: Math.sin(angle) * speed,
-                life: 1,
-                decay: 0.02 + Math.random() * 0.03,
-                color: color,
-                size: 2 + Math.random() * 4
-            });
-        }
-    }
-
-    function updateParticles() {
-        for (let i = particles.length - 1; i >= 0; i--) {
-            const p = particles[i];
-            p.x += p.vx;
-            p.y += p.vy;
-            p.life -= p.decay;
-            if (p.life <= 0) particles.splice(i, 1);
-        }
-    }
-
-    function drawParticles() {
-        particles.forEach(p => {
-            ctx.save();
-            ctx.globalAlpha = p.life;
-            ctx.fillStyle = p.color;
-            ctx.beginPath();
-            ctx.arc(p.x, p.y, p.size, 0, Math.PI * 2);
-            ctx.fill();
-            ctx.restore();
-        });
-    }
-
-    // ─── Game Logic ──────────────────────────────────────────────
-    function startGame() {
-        createCards();
-        flippedCards = [];
-        matchedPairs = 0;
-        misses = 0;
-        timer = TOTAL_TIME;
-        previewTimer = PREVIEW_TIME;
-        selectorRow = 0;
-        selectorCol = 0;
-        particles = [];
-        flipAnimations = [];
-        canInteract = false;
-        matchFlashTimer = 0;
-        
-        gameState = STATE.PREVIEW;
-
-        // Flip all cards face up for preview
-        cards.forEach((card, i) => {
-            card.faceUp = true;
-            card.matched = false;
-            flipAnimations.push({
-                cardIndex: i,
-                progress: 0,
-                direction: "flipIn",
-                done: false,
-                duration: 500 // Slower for preview
-            });
-        });
-    }
-
-    function flipCard(index, callback) {
-        flipAnimations.push({
-            cardIndex: index,
-            progress: 0,
-            direction: "flipIn", // Face up
-            done: false,
-            callback: callback,
-            duration: FLIP_DURATION
-        });
-    }
-
-    function flipCardBack(index, callback) {
-        flipAnimations.push({
-            cardIndex: index,
-            progress: 0,
-            direction: "flipOut", // Face down
-            done: false,
-            callback: callback,
-            duration: FLIP_DURATION
-        });
-    }
-
-    function updateFlipAnimations(dt) {
-        flipAnimations.forEach(anim => {
-            if (!anim.done) {
-                anim.progress += dt / (anim.duration * 0.001);
-                if (anim.progress >= 1) {
-                    anim.progress = 1;
-                    anim.done = true;
-                    if (anim.callback) anim.callback();
-                }
-            }
-        });
-        flipAnimations = flipAnimations.filter(a => !a.done);
-    }
-
-    function checkMatch() {
-        if (flippedCards.length < 2) return;
-
-        const [a, b] = flippedCards;
-        const cardA = cards[a];
-        const cardB = cards[b];
-
-        if (cardA.shape === cardB.shape && cardA.color === cardB.color) {
-            // Match!
-            cardA.matched = true;
-            cardB.matched = true;
-            matchedPairs++;
-
-            const layout = getCardLayout();
-            const posA = getCardPos(a % COLS, Math.floor(a / COLS), layout);
-            const posB = getCardPos(b % COLS, Math.floor(b / COLS), layout);
-            spawnMatchParticles(posA.x, posA.y, cardA.color);
-            spawnMatchParticles(posB.x, posB.y, cardB.color);
-            matchFlashTimer = 0.3;
-
-            flippedCards = [];
-            canInteract = true;
-
-            if (matchedPairs === TOTAL_PAIRS) {
-                setTimeout(() => { gameState = STATE.WIN; }, 1000);
-            }
-        } else {
-            // No Match
-            misses++;
-            shakeTimer = 0.4;
-            shakeIntensity = 10;
-            
-            flippedCards = [];
-            
-            // Flip back after delay
-            setTimeout(() => {
-                if(gameState !== STATE.PLAYING) return;
-                flipCardBack(a);
-                flipCardBack(b);
-            }, 800);
-        }
-    }
-
-    function handleCardSelect(index) {
-        if (!canInteract || gameState !== STATE.PLAYING) return;
-        const card = cards[index];
-        if (card.matched || card.faceUp || flippedCards.includes(index)) return;
-
-        canInteract = false;
-        flippedCards.push(index);
-        
-        // Small delay to ensure visual order
-        flipCardFront(index);
-        if(flippedCards.length === 2) {
-             setTimeout(checkMatch, 350); // Wait for second flip animation
-        }
-    }
-
-    function flipCardFront(index) {
-        flipAnimations.push({
-            cardIndex: index,
-            progress: 0,
-            direction: "flipIn",
-            done: false,
-            duration: FLIP_DURATION
-        });
-    }
-
-    function flipCardBack(index) {
-        flipAnimations.push({
-            cardIndex: index,
-            progress: 0,
-            direction: "flipOut",
-            done: false,
-            duration: FLIP_DURATION
-        });
-        cards[index].faceUp = false;
-    }
-
-    // ─── Input Handling ──────────────────────────────────────────
-    document.addEventListener("keydown", (e) => {
-        if (["ArrowUp", "ArrowDown", "ArrowLeft", "ArrowRight", "Enter", " "].includes(e.key)) {
-            e.preventDefault();
-        }
-
-        if (gameState === STATE.TITLE || gameState === STATE.WIN || gameState === STATE.LOSE) {
-            startGame();
-            return;
-        }
-
-        if (gameState !== STATE.PLAYING) return;
-
-        switch (e.key) {
-            case "ArrowUp":    selectorRow = Math.max(0, selectorRow - 1); break;
-            case "ArrowDown":  selectorRow = Math.min(ROWS - 1, selectorRow + 1); break;
-            case "ArrowLeft":  selectorCol = Math.max(0, selectorCol - 1); break;
-            case "ArrowRight": selectorCol = Math.min(COLS - 1, selectorCol + 1); break;
-            case "Enter":
-            case " ":          handleCardSelect(selectorRow * COLS + selectorCol); break;
-        }
-    });
-
-    canvas.addEventListener("click", handlePointer);
-    canvas.addEventListener("touchstart", (e) => {
-        e.preventDefault();
-        handlePointer(e.touches[0]);
-    }, { passive: false });
-
-    function handlePointer(e) {
-        if (gameState === STATE.TITLE || gameState === STATE.WIN || gameState === STATE.LOSE) {
-            startGame();
-            return;
-        }
-
-        if (gameState !== STATE.PLAYING || !canInteract) return;
-
-        const rect = canvas.getBoundingClientRect();
-        const scaleX = INTERNAL_W / rect.width;
-        const scaleY = INTERNAL_H / rect.height;
-        const mx = (e.clientX - rect.left) * scaleX;
-        const my = (e.clientY - rect.top) * scaleY;
-
-        const layout = getCardLayout();
-
-        for (let i = 0; i < cards.length; i++) {
-            const pos = getCardPos(i % COLS, Math.floor(i / COLS), layout);
-            // Simple hit detection
-            if (mx >= pos.x - layout.cardW/2 && mx <= pos.x + layout.cardW/2 &&
-                my >= pos.y - layout.cardH/2 && my <= pos.y + layout.cardH/2) {
-                
-                selectorCol = i % COLS;
-                selectorRow = Math.floor(i / COLS);
-                handleCardSelect(i);
-                return;
-            }
-        }
-    }
-
-    // ─── End Screens ─────────────────────────────────────────────
-    function drawEndScreen(isWin) {
-        drawBackground();
-        
-        // Dim Overlay
-        ctx.save();
-        ctx.fillStyle = "rgba(0,0,0,0.8)";
-        ctx.fillRect(0, 0, INTERNAL_W, INTERNAL_H);
-        ctx.restore();
-
-        const cx = INTERNAL_W / 2;
-        const cy = INTERNAL_H / 2;
-
-        ctx.save();
+        // Draw shape with glow
+        const cx = x + CARD_W / 2;
+        const cy = y + CARD_H / 2;
+        ctx.shadowColor = card.color;
+        ctx.shadowBlur = 12;
+        drawShape(card.shape, cx, cy, CARD_W * 0.25, card.color);
+        ctx.shadowBlur = 0;
+      } else {
+        ctx.fillStyle = ARNE.DARK_NAVY;
+        ctx.fill();
+        ctx.strokeStyle = ARNE.LIGHT_BLUE;
+        ctx.lineWidth = 2;
+        ctx.stroke();
+        // Draw shape
+        const cx = x + CARD_W / 2;
+        const cy = y + CARD_H / 2;
+        drawShape(card.shape, cx, cy, CARD_W * 0.25, card.color);
+        // Shape label
+        ctx.fillStyle = ARNE.GRAY;
+        ctx.font = "11px monospace";
         ctx.textAlign = "center";
-        ctx.textBaseline = "middle";
+        ctx.fillText(card.shape.toUpperCase(), cx, y + CARD_H - 8);
+      }
+    } else {
+      // Face down — cyberpunk pattern
+      drawRoundedRect(x, y, CARD_W, CARD_H, CARD_RADIUS);
+      ctx.fillStyle = ARNE.DARK_TEAL;
+      ctx.fill();
+      ctx.strokeStyle = ARNE.LIGHT_BLUE;
+      ctx.lineWidth = 2;
+      ctx.stroke();
 
-        if (isWin) {
-            ctx.font = "bold 60px monospace";
-            ctx.fillStyle = C.lime;
-            ctx.shadowColor = C.lime;
-            ctx.shadowBlur = 20;
-            ctx.fillText("SYSTEM SECURE", cx, cy - 40);
-            
-            ctx.shadowBlur = 0;
-            ctx.fillStyle = C.ice;
-            ctx.font = "24px monospace";
-            ctx.fillText(`Score: ${Math.floor(timer) * 10}`, cx, cy + 30);
+      // Inner pattern
+      const cx = x + CARD_W / 2;
+      const cy = y + CARD_H / 2;
+      // Prism symbol
+      ctx.strokeStyle = ARNE.LIGHT_BLUE;
+      ctx.globalAlpha = 0.6;
+      ctx.lineWidth = 1.5;
+      drawPolygon(cx, cy, 6, CARD_W * 0.28);
+      ctx.stroke();
+      // Inner diamond
+      ctx.beginPath();
+      ctx.moveTo(cx, cy - 14);
+      ctx.lineTo(cx + 10, cy);
+      ctx.lineTo(cx, cy + 14);
+      ctx.lineTo(cx - 10, cy);
+      ctx.closePath();
+      ctx.stroke();
+      ctx.globalAlpha = 1;
 
+      // Corner accents
+      const accent = 12;
+      ctx.strokeStyle = ARNE.LIME;
+      ctx.lineWidth = 2;
+      ctx.globalAlpha = 0.7;
+      // Top-left
+      ctx.beginPath();
+      ctx.moveTo(x + 4, y + accent);
+      ctx.lineTo(x + 4, y + 4);
+      ctx.lineTo(x + accent, y + 4);
+      ctx.stroke();
+      // Top-right
+      ctx.beginPath();
+      ctx.moveTo(x + CARD_W - accent, y + 4);
+      ctx.lineTo(x + CARD_W - 4, y + 4);
+      ctx.lineTo(x + CARD_W - 4, y + accent);
+      ctx.stroke();
+      // Bottom-left
+      ctx.beginPath();
+      ctx.moveTo(x + 4, y + CARD_H - accent);
+      ctx.lineTo(x + 4, y + CARD_H - 4);
+      ctx.lineTo(x + accent, y + CARD_H - 4);
+      ctx.stroke();
+      // Bottom-right
+      ctx.beginPath();
+      ctx.moveTo(x + CARD_W - accent, y + CARD_H - 4);
+      ctx.lineTo(x + CARD_W - 4, y + CARD_H - 4);
+      ctx.lineTo(x + CARD_W - 4, y + CARD_H - accent);
+      ctx.stroke();
+      ctx.globalAlpha = 1;
+    }
+  }
+
+  // ── Draw HUD ────────────────────────────────────────────
+  function drawHUD() {
+    // Timer bar
+    const barW = BASE - 2 * MARGIN;
+    const barH = 8;
+    const barX = MARGIN;
+    const barY = MARGIN + 10;
+
+    drawRoundedRect(barX, barY, barW, barH, 4);
+    ctx.fillStyle = ARNE.DARK_NAVY;
+    ctx.fill();
+
+    const pct = Math.max(0, timer / TIME_LIMIT);
+    if (pct > 0) {
+      let barColor = ARNE.LIGHT_BLUE;
+      if (pct < 0.25) barColor = ARNE.RED;
+      else if (pct < 0.5) barColor = ARNE.ORANGE;
+      else if (pct < 0.75) barColor = ARNE.YELLOW;
+
+      drawRoundedRect(barX, barY, barW * pct, barH, 4);
+      ctx.fillStyle = barColor;
+      ctx.fill();
+    }
+
+    // Timer text
+    const mins = Math.floor(timer / 60);
+    const secs = Math.floor(timer % 60);
+    ctx.fillStyle = ARNE.WHITE;
+    ctx.font = "bold 18px monospace";
+    ctx.textAlign = "center";
+    ctx.fillText(`${mins}:${secs.toString().padStart(2, "0")}`, BASE / 2, MARGIN + 40);
+
+    // Misses
+    ctx.textAlign = "left";
+    ctx.font = "14px monospace";
+    ctx.fillStyle = ARNE.RED;
+    ctx.fillText(`MISSES: ${misses}`, MARGIN, MARGIN + 40);
+
+    // Pairs found
+    const found = cards.filter(c => c.matched).length / 2;
+    ctx.textAlign = "right";
+    ctx.fillStyle = ARNE.LIME;
+    ctx.fillText(`PAIRS: ${found}/${TOTAL_PAIRS}`, BASE - MARGIN, MARGIN + 40);
+  }
+
+  // ── Draw Selector Cursor ────────────────────────────────
+  function drawSelector() {
+    if (gState !== STATE.PLAYING) return;
+    const x = cardX(selectCol);
+    const y = cardY(selectRow);
+
+    ctx.save();
+    ctx.strokeStyle = ARNE.LIME;
+    ctx.lineWidth = 3;
+    ctx.shadowColor = ARNE.LIME;
+    ctx.shadowBlur = 8;
+
+    // Animated brackets
+    const t = performance.now() / 300;
+    const offset = Math.sin(t) * 2;
+
+    // Top-left bracket
+    ctx.beginPath();
+    ctx.moveTo(x - 4 + offset, y + 14);
+    ctx.lineTo(x - 4 + offset, y - 4);
+    ctx.lineTo(x + 14, y - 4);
+    ctx.stroke();
+
+    // Top-right bracket
+    ctx.beginPath();
+    ctx.moveTo(x + CARD_W - 14, y - 4);
+    ctx.lineTo(x + CARD_W + 4 - offset, y - 4);
+    ctx.lineTo(x + CARD_W + 4 - offset, y + 14);
+    ctx.stroke();
+
+    // Bottom-left bracket
+    ctx.beginPath();
+    ctx.moveTo(x - 4 + offset, y + CARD_H - 14);
+    ctx.lineTo(x - 4 + offset, y + CARD_H + 4);
+    ctx.lineTo(x + 14, y + CARD_H + 4);
+    ctx.stroke();
+
+    // Bottom-right bracket
+    ctx.beginPath();
+    ctx.moveTo(x + CARD_W - 14, y + CARD_H + 4);
+    ctx.lineTo(x + CARD_W + 4 - offset, y + CARD_H + 4);
+    ctx.lineTo(x + CARD_W + 4 - offset, y + CARD_H - 14);
+    ctx.stroke();
+
+    ctx.restore();
+  }
+
+  // ── Title Screen ────────────────────────────────────────
+  let titlePulse = 0;
+  function drawTitleScreen(dt) {
+    titlePulse += dt * 0.003;
+
+    // Background
+    ctx.fillStyle = ARNE.BLACK;
+    ctx.fillRect(0, 0, BASE, BASE);
+
+    // Grid lines (cyberpunk feel)
+    ctx.strokeStyle = ARNE.DARK_NAVY;
+    ctx.lineWidth = 0.5;
+    for (let i = 0; i < BASE; i += 40) {
+      ctx.beginPath();
+      ctx.moveTo(i, 0);
+      ctx.lineTo(i, BASE);
+      ctx.stroke();
+      ctx.beginPath();
+      ctx.moveTo(0, i);
+      ctx.lineTo(BASE, i);
+      ctx.stroke();
+    }
+
+    // Title
+    ctx.save();
+    ctx.shadowColor = ARNE.LIGHT_BLUE;
+    ctx.shadowBlur = 20 + Math.sin(titlePulse) * 10;
+    ctx.fillStyle = ARNE.LIGHT_BLUE;
+    ctx.font = "bold 56px monospace";
+    ctx.textAlign = "center";
+    ctx.textBaseline = "middle";
+    ctx.fillText("PRISM PANIC", BASE / 2, BASE * 0.3);
+    ctx.shadowBlur = 0;
+    ctx.restore();
+
+    // Subtitle
+    ctx.fillStyle = ARNE.LIME;
+    ctx.font = "16px monospace";
+    ctx.textAlign = "center";
+    ctx.fillText("MEMORY MATCH // CYBERPUNK EDITION", BASE / 2, BASE * 0.39);
+
+    // Decorative shapes
+    const shapeSize = 28;
+    const rowY = BASE * 0.52;
+    const spacing = BASE / (SHAPES.length + 1);
+    for (let i = 0; i < SHAPES.length; i++) {
+      const sx = spacing * (i + 1);
+      drawShape(SHAPES[i], sx, rowY, shapeSize, PAIR_COLORS[i]);
+    }
+
+    // Start prompt
+    const alpha = 0.5 + 0.5 * Math.sin(titlePulse * 2);
+    ctx.globalAlpha = alpha;
+    ctx.fillStyle = ARNE.WHITE;
+    ctx.font = "bold 22px monospace";
+    ctx.fillText("[ PRESS ANY KEY / TAP TO START ]", BASE / 2, BASE * 0.7);
+    ctx.globalAlpha = 1;
+
+    // Controls info
+    ctx.fillStyle = ARNE.GRAY;
+    ctx.font = "13px monospace";
+    ctx.fillText("MOUSE: CLICK CARD TO FLIP", BASE / 2, BASE * 0.82);
+    ctx.fillText("KEYBOARD: ARROW KEYS + ENTER", BASE / 2, BASE * 0.87);
+
+    // Version
+    ctx.fillStyle = ARNE.DARK_TEAL;
+    ctx.font = "11px monospace";
+    ctx.fillText("v1.0 // ARNE16 PALETTE", BASE / 2, BASE * 0.95);
+  }
+
+  // ── Preview Screen ──────────────────────────────────────
+  function drawPreviewScreen() {
+    // Background
+    ctx.fillStyle = ARNE.BLACK;
+    ctx.fillRect(0, 0, BASE, BASE);
+
+    // Grid lines
+    ctx.strokeStyle = ARNE.DARK_NAVY;
+    ctx.lineWidth = 0.5;
+    for (let i = 0; i < BASE; i += 40) {
+      ctx.beginPath();
+      ctx.moveTo(i, 0);
+      ctx.lineTo(i, BASE);
+      ctx.stroke();
+      ctx.beginPath();
+      ctx.moveTo(0, i);
+      ctx.lineTo(BASE, i);
+      ctx.stroke();
+    }
+
+    drawHUD();
+
+    // Draw all cards face up
+    for (const card of cards) {
+      drawCard(card);
+    }
+
+    // Countdown overlay
+    const remaining = Math.max(0, previewEnd - performance.now());
+    const count = Math.ceil(remaining / 1000);
+    const alpha = 0.3 + 0.3 * Math.sin(performance.now() / 200);
+
+    ctx.fillStyle = `rgba(0, 0, 0, ${alpha})`;
+    ctx.fillRect(MARGIN, BOARD_TOP, BOARD_SIZE, BOARD_SIZE);
+
+    ctx.fillStyle = ARNE.LIGHT_BLUE;
+    ctx.font = "bold 48px monospace";
+    ctx.textAlign = "center";
+    ctx.textBaseline = "middle";
+    ctx.fillText(count.toString(), BASE / 2, BOARD_TOP + BOARD_SIZE / 2);
+
+    ctx.fillStyle = ARNE.GRAY;
+    ctx.font = "14px monospace";
+    ctx.fillText("MEMORIZE THE CARDS", BASE / 2, BOARD_TOP + BOARD_SIZE / 2 + 40);
+  }
+
+  // ── Game Screen ─────────────────────────────────────────
+  function drawGameScreen() {
+    // Background
+    ctx.fillStyle = ARNE.BLACK;
+    ctx.fillRect(0, 0, BASE, BASE);
+
+    // Grid lines
+    ctx.strokeStyle = ARNE.DARK_NAVY;
+    ctx.lineWidth = 0.5;
+    for (let i = 0; i < BASE; i += 40) {
+      ctx.beginPath();
+      ctx.moveTo(i, 0);
+      ctx.lineTo(i, BASE);
+      ctx.stroke();
+      ctx.beginPath();
+      ctx.moveTo(0, i);
+      ctx.lineTo(BASE, i);
+      ctx.stroke();
+    }
+
+    drawHUD();
+
+    // Draw cards
+    for (const card of cards) {
+      drawCard(card);
+    }
+
+    // Selector
+    drawSelector();
+
+    // Particles
+    drawParticles();
+  }
+
+  // ── Win Screen ──────────────────────────────────────────
+  function drawWinScreen() {
+    ctx.fillStyle = ARNE.BLACK;
+    ctx.fillRect(0, 0, BASE, BASE);
+
+    // Grid lines
+    ctx.strokeStyle = ARNE.DARK_NAVY;
+    ctx.lineWidth = 0.5;
+    for (let i = 0; i < BASE; i += 40) {
+      ctx.beginPath();
+      ctx.moveTo(i, 0);
+      ctx.lineTo(i, BASE);
+      ctx.stroke();
+      ctx.beginPath();
+      ctx.moveTo(0, i);
+      ctx.lineTo(BASE, i);
+      ctx.stroke();
+    }
+
+    // Show matched board
+    for (const card of cards) {
+      drawCard(card);
+    }
+
+    // Victory text
+    ctx.save();
+    ctx.shadowColor = ARNE.LIME;
+    ctx.shadowBlur = 15;
+    ctx.fillStyle = ARNE.LIME;
+    ctx.font = "bold 48px monospace";
+    ctx.textAlign = "center";
+    ctx.fillText("SYSTEM", BASE / 2, BASE * 0.3);
+    ctx.fillText("UNLOCKED", BASE / 2, BASE * 0.3 + 55);
+    ctx.shadowBlur = 0;
+    ctx.restore();
+
+    // Score
+    ctx.fillStyle = ARNE.YELLOW;
+    ctx.font = "bold 36px monospace";
+    ctx.fillText(`SCORE: ${score}`, BASE / 2, BASE * 0.55);
+
+    // Stats
+    ctx.fillStyle = ARNE.GRAY;
+    ctx.font = "16px monospace";
+    ctx.fillText(`TIME REMAINING: ${Math.floor(timer)}s`, BASE / 2, BASE * 0.63);
+    ctx.fillText(`MISSES: ${misses}`, BASE / 2, BASE * 0.67);
+
+    const alpha = 0.5 + 0.5 * Math.sin(performance.now() / 300);
+    ctx.globalAlpha = alpha;
+    ctx.fillStyle = ARNE.WHITE;
+    ctx.font = "bold 20px monospace";
+    ctx.fillText("[ PRESS ANY KEY / TAP TO PLAY AGAIN ]", BASE / 2, BASE * 0.8);
+    ctx.globalAlpha = 1;
+  }
+
+  // ── Lose Screen ─────────────────────────────────────────
+  function drawLoseScreen() {
+    ctx.fillStyle = ARNE.BLACK;
+    ctx.fillRect(0, 0, BASE, BASE);
+
+    // Grid lines
+    ctx.strokeStyle = ARNE.DARK_NAVY;
+    ctx.lineWidth = 0.5;
+    for (let i = 0; i < BASE; i += 40) {
+      ctx.beginPath();
+      ctx.moveTo(i, 0);
+      ctx.lineTo(i, BASE);
+      ctx.stroke();
+      ctx.beginPath();
+      ctx.moveTo(0, i);
+      ctx.lineTo(BASE, i);
+      ctx.stroke();
+    }
+
+    // Show board with remaining cards
+    for (const card of cards) {
+      drawCard(card);
+    }
+
+    // Defeat text
+    ctx.save();
+    ctx.shadowColor = ARNE.RED;
+    ctx.shadowBlur = 15;
+    ctx.fillStyle = ARNE.RED;
+    ctx.font = "bold 48px monospace";
+    ctx.textAlign = "center";
+    ctx.fillText("SYSTEM", BASE / 2, BASE * 0.3);
+    ctx.fillText("LOCKED", BASE / 2, BASE * 0.3 + 55);
+    ctx.shadowBlur = 0;
+    ctx.restore();
+
+    // Stats
+    ctx.fillStyle = ARNE.GRAY;
+    ctx.font = "18px monospace";
+    const matched = cards.filter(c => c.matched).length / 2;
+    ctx.fillText(`PAIRS FOUND: ${matched}/${TOTAL_PAIRS}`, BASE / 2, BASE * 0.55);
+    ctx.fillText(`MISSES: ${misses}`, BASE / 2, BASE * 0.60);
+
+    const alpha = 0.5 + 0.5 * Math.sin(performance.now() / 300);
+    ctx.globalAlpha = alpha;
+    ctx.fillStyle = ARNE.WHITE;
+    ctx.font = "bold 20px monospace";
+    ctx.fillText("[ PRESS ANY KEY / TAP TO TRY AGAIN ]", BASE / 2, BASE * 0.8);
+    ctx.globalAlpha = 1;
+  }
+
+  // ── Update Flip Animations ──────────────────────────────
+  function updateFlips(now) {
+    for (const card of cards) {
+      if (card._flipTarget !== undefined) {
+        const diff = card._flipTarget - card.flipProgress;
+        if (Math.abs(diff) > 0.005) {
+          card.flipProgress += diff * 0.2;
         } else {
-            ctx.font = "bold 60px monospace";
-            ctx.fillStyle = C.crimson;
-            ctx.shadowColor = C.crimson;
-            ctx.shadowBlur = 20;
-            ctx.fillText("CONNECTION LOST", cx, cy - 40);
-
-            ctx.shadowBlur = 0;
-            ctx.fillStyle = C.gray;
-            ctx.font = "24px monospace";
-            ctx.fillText(`Pairs: ${matchedPairs}/${TOTAL_PAIRS}`, cx, cy + 30);
+          card.flipProgress = card._flipTarget;
+          card.flipped = card._flipTarget === 1;
+          card._flipTarget = undefined;
         }
+      }
+    }
+  }
 
-        const blink = Math.sin(Date.now() / 300) * 0.4 + 0.6;
-        ctx.font = "20px monospace";
-        ctx.fillStyle = C.white;
-        ctx.globalAlpha = blink;
-        ctx.fillText("[ CLICK TO RESTART ]", cx, cy + 120);
-        ctx.restore();
+  // ── Input Handling ──────────────────────────────────────
+  function getCardAt(px, py) {
+    // Convert screen coords to canvas coords
+    const rect = canvas.getBoundingClientRect();
+    const sx = (px - rect.left) / rect.width * BASE;
+    const sy = (py - rect.top) / rect.height * BASE;
+    for (let r = 0; r < GRID_ROWS; r++) {
+      for (let c = 0; c < GRID_COLS; c++) {
+        const cx = cardX(c);
+        const cy = cardY(r);
+        if (sx >= cx && sx <= cx + CARD_W && sy >= cy && sy <= cy + CARD_H) {
+          return { row: r, col: c };
+        }
+      }
+    }
+    return null;
+  }
+
+  function handleInput(row, col) {
+    if (gState === STATE.TITLE) {
+      startGame();
+      return;
+    }
+    if (gState === STATE.WIN || gState === STATE.LOSE) {
+      startGame();
+      return;
+    }
+    if (gState === STATE.PLAYING) {
+      selectCard(row, col);
+      return;
+    }
+  }
+
+  // Mouse
+  canvas.addEventListener("click", (e) => {
+    const hit = getCardAt(e.clientX, e.clientY);
+    if (hit) {
+      handleInput(hit.row, hit.col);
+    } else {
+      // Click outside grid — still valid for title/end screens
+      if (gState === STATE.TITLE || gState === STATE.WIN || gState === STATE.LOSE) {
+        startGame();
+      }
+    }
+  });
+
+  // Touch
+  canvas.addEventListener("touchstart", (e) => {
+    e.preventDefault();
+    const touch = e.touches[0];
+    const hit = getCardAt(touch.clientX, touch.clientY);
+    if (hit) {
+      handleInput(hit.row, hit.col);
+    } else {
+      if (gState === STATE.TITLE || gState === STATE.WIN || gState === STATE.LOSE) {
+        startGame();
+      }
+    }
+  }, { passive: false });
+
+  // Keyboard
+  window.addEventListener("keydown", (e) => {
+    if (gState === STATE.TITLE) {
+      startGame();
+      return;
+    }
+    if (gState === STATE.WIN || gState === STATE.LOSE) {
+      startGame();
+      return;
+    }
+    if (gState === STATE.PLAYING) {
+      switch (e.key) {
+        case "ArrowUp":
+          e.preventDefault();
+          selectRow = Math.max(0, selectRow - 1);
+          break;
+        case "ArrowDown":
+          e.preventDefault();
+          selectRow = Math.min(GRID_ROWS - 1, selectRow + 1);
+          break;
+        case "ArrowLeft":
+          e.preventDefault();
+          selectCol = Math.max(0, selectCol - 1);
+          break;
+        case "ArrowRight":
+          e.preventDefault();
+          selectCol = Math.min(GRID_COLS - 1, selectCol + 1);
+          break;
+        case "Enter":
+        case " ":
+          e.preventDefault();
+          selectCard(selectRow, selectCol);
+          break;
+      }
+    }
+  });
+
+  // ── Main Loop ───────────────────────────────────────────
+  let lastTime = performance.now();
+
+  function gameLoop(now) {
+    const dt = now - lastTime;
+    lastTime = now;
+
+    // Update timer
+    if (gState === STATE.PLAYING || gState === STATE.PREVIEW) {
+      timerAccum += dt;
+      if (timerAccum >= 1000) {
+        timerAccum -= 1000;
+        timer--;
+        if (timer <= 0) {
+          timer = 0;
+          gState = STATE.LOSE;
+        }
+      }
     }
 
-    // ─── Main Loop ──────────────────────────────────────────────
-    function gameLoop(timestamp) {
-        const dt = lastTime ? Math.min((timestamp - lastTime) / 1000, 0.1) : 0;
-        lastTime = timestamp;
-
-        // Update Timer
-        if (gameState === STATE.PLAYING) {
-            timer -= dt;
-            if (timer <= 0) {
-                timer = 0;
-                gameState = STATE.LOSE;
-            }
-        }
-        // Preview Timer
-        else if (gameState === STATE.PREVIEW) {
-            previewTimer -= dt;
-            if (previewTimer <= 0) {
-                // End preview
-                cards.forEach((card, i) => {
-                    card.faceUp = false;
-                    flipCardBack(i);
-                });
-                setTimeout(() => {
-                    gameState = STATE.PLAYING;
-                    canInteract = true;
-                }, FLIP_DURATION + 200);
-            }
-        }
-
-        if (shakeTimer > 0) shakeTimer -= dt;
-        if (matchFlashTimer > 0) matchFlashTimer -= dt;
-
-        // Clear Canvas
-        ctx.clearRect(0, 0, INTERNAL_W, INTERNAL_H);
-
-        // Shake Effect
-        ctx.save();
-        if (shakeTimer > 0) {
-            const sx = (Math.random() - 0.5) * 20 * shakeTimer;
-            const sy = (Math.random() - 0.5) * 20 * shakeTimer;
-            ctx.translate(sx, sy);
-        }
-
-        // Draw based on state
-        switch (gameState) {
-            case STATE.TITLE:
-                drawTitleScreen(dt);
-                break;
-            case STATE.PREVIEW:
-                drawGameBoard(dt);
-                ctx.save();
-                ctx.fillStyle = C.white;
-                ctx.font = "bold 30px monospace";
-                ctx.shadowColor = C.sky;
-                ctx.shadowBlur = 10;
-                ctx.fillText("MEMORY MODE", INTERNAL_W/2, INTERNAL_H - 50);
-                ctx.restore();
-                break;
-            case STATE.PLAYING:
-                drawGameBoard(dt);
-                break;
-            case STATE.WIN:
-                drawEndScreen(true);
-                break;
-            case STATE.LOSE:
-                drawEndScreen(false);
-                break;
-        }
-
-        ctx.restore(); // End Shake
-        updateParticles();
-
-        requestAnimationFrame(gameLoop);
+    // End preview
+    if (gState === STATE.PREVIEW && now >= previewEnd) {
+      gState = STATE.PLAYING;
+      // Flip all cards face down instantly
+      for (const card of cards) {
+        card.flipped = false;
+        card.flipProgress = 0;
+        card._flipTarget = undefined;
+        card.matched = false;
+      }
     }
 
-    // Start
+    // Update flips
+    updateFlips(now);
+
+    // Update particles
+    updateParticles();
+
+    // Draw
+    switch (gState) {
+      case STATE.TITLE:
+        drawTitleScreen(dt);
+        break;
+      case STATE.PREVIEW:
+        drawPreviewScreen();
+        break;
+      case STATE.PLAYING:
+        drawGameScreen();
+        break;
+      case STATE.WIN:
+        drawWinScreen();
+        break;
+      case STATE.LOSE:
+        drawLoseScreen();
+        break;
+    }
+
     requestAnimationFrame(gameLoop);
+  }
 
+  // ── Start ───────────────────────────────────────────────
+  requestAnimationFrame(gameLoop);
 })();
-
