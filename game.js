@@ -8,20 +8,20 @@
 
   // ── Arne16 Palette ──────────────────────────────────────
   const ARNE = {
-    BLACK:      "#000000",
-    GRAY:       "#9D9D9D",
-    WHITE:      "#FFFFFF",
-    RED:        "#BE2633",
-    PINK:       "#E06F8B",
-    BROWN:      "#493C2B",
-    DARK_ORANGE:"#A46422",
-    ORANGE:     "#EB8931",
-    YELLOW:     "#F7E26B",
-    DARK_TEAL:  "#2F484E",
-    GREEN:      "#44891A",
-    LIME:       "#A3CE27",
-    DARK_NAVY:  "#1B2632",
-    BLUE:       "#005784",
+    BLACK: "#000000",
+    GRAY: "#9D9D9D",
+    WHITE: "#FFFFFF",
+    RED: "#BE2633",
+    PINK: "#E06F8B",
+    BROWN: "#493C2B",
+    DARK_ORANGE: "#A46422",
+    ORANGE: "#EB8931",
+    YELLOW: "#F7E26B",
+    DARK_TEAL: "#2F484E",
+    GREEN: "#44891A",
+    LIME: "#A3CE27",
+    DARK_NAVY: "#1B2632",
+    BLUE: "#005784",
     LIGHT_BLUE: "#31A2F2",
     LIGHT_CYAN: "#B2DCEF",
   };
@@ -30,32 +30,44 @@
 
   // ── Shapes (8 unique) ───────────────────────────────────
   const SHAPES = [
-    "circle", "square", "triangle", "star",
-    "heart", "diamond", "pentagon", "hexagon"
+    "circle",
+    "square",
+    "triangle",
+    "star",
+    "heart",
+    "diamond",
+    "pentagon",
+    "hexagon",
   ];
 
   // Colors used for card pairs (8 distinct, from Arne16 minus neutrals)
   const PAIR_COLORS = [
-    ARNE.RED, ARNE.PINK, ARNE.ORANGE, ARNE.YELLOW,
-    ARNE.GREEN, ARNE.LIGHT_BLUE, ARNE.LIME, ARNE.DARK_ORANGE
+    ARNE.RED,
+    ARNE.PINK,
+    ARNE.ORANGE,
+    ARNE.YELLOW,
+    ARNE.GREEN,
+    ARNE.LIGHT_BLUE,
+    ARNE.LIME,
+    ARNE.DARK_ORANGE,
   ];
 
   // ── Game States ─────────────────────────────────────────
   const STATE = {
-    TITLE:    "title",
-    PREVIEW:  "preview",
-    PLAYING:  "playing",
-    WIN:      "win",
-    LOSE:     "lose",
+    TITLE: "title",
+    PREVIEW: "preview",
+    PLAYING: "playing",
+    WIN: "win",
+    LOSE: "lose",
   };
 
   // ── Constants ───────────────────────────────────────────
   const GRID_COLS = 4;
   const GRID_ROWS = 4;
   const TOTAL_PAIRS = 8;
-  const TIME_LIMIT = 300;        // 5 minutes in seconds
-  const PREVIEW_TIME = 3000;     // 3 seconds preview
-  const FLIP_DURATION = 300;     // flip animation ms
+  const TIME_LIMIT = 300; // 5 minutes in seconds
+  const PREVIEW_TIME = 3000; // 3 seconds preview
+  const FLIP_DURATION = 300; // flip animation ms
   const MISS_PENALTY = 50;
   const POINTS_PER_SECOND = 5;
 
@@ -94,21 +106,25 @@
   const CARD_H = CARD_W;
   const CARD_RADIUS = 12;
 
-  function cardX(col) { return MARGIN + col * (CARD_W + CARD_GAP); }
-  function cardY(row) { return BOARD_TOP + row * (CARD_H + CARD_GAP); }
+  function cardX(col) {
+    return MARGIN + col * (CARD_W + CARD_GAP);
+  }
+  function cardY(row) {
+    return BOARD_TOP + row * (CARD_H + CARD_GAP);
+  }
 
   // ── Game State ──────────────────────────────────────────
   let gState = STATE.TITLE;
-  let cards = [];          // {shape, color, matched, flipped, row, col}
+  let cards = []; // {shape, color, matched, flipped, row, col}
   let timer = TIME_LIMIT;
   let timerAccum = 0;
   let misses = 0;
-  let flippedCards = [];   // currently face-up (non-matched)
-  let locked = false;      // input lock during animations
+  let flippedCards = []; // currently face-up (non-matched)
+  let locked = false; // input lock during animations
   let previewEnd = 0;
   let animating = false;
   let animStart = 0;
-  let animType = "";       // "flipUp" | "flipDown" | "revealMatch"
+  let animType = ""; // "flipUp" | "flipDown" | "revealMatch"
   let animTargets = [];
   let selectRow = 0;
   let selectCol = 0;
@@ -177,7 +193,7 @@
   function selectCard(row, col) {
     if (gState !== STATE.PLAYING) return;
     if (locked || animating) return;
-    const card = cards.find(c => c.row === row && c.col === col);
+    const card = cards.find((c) => c.row === row && c.col === col);
     if (!card) return;
     if (card.matched) return;
     if (card.flipProgress >= 0.5) return; // already face-up
@@ -214,8 +230,11 @@
           spawnMatchParticles(card);
           spawnMatchParticles(first);
           // Check win
-          if (cards.every(c => c.matched)) {
-            score = Math.max(1, Math.floor(timer) * POINTS_PER_SECOND - misses * MISS_PENALTY);
+          if (cards.every((c) => c.matched)) {
+            score = Math.max(
+              1,
+              Math.floor(timer) * POINTS_PER_SECOND - misses * MISS_PENALTY,
+            );
             gState = STATE.WIN;
           }
           locked = false;
@@ -242,10 +261,11 @@
     const cx = cardX(card.col) + CARD_W / 2;
     const cy = cardY(card.row) + CARD_H / 2;
     for (let i = 0; i < 12; i++) {
-      const angle = (Math.PI * 2 / 12) * i + Math.random() * 0.5;
+      const angle = ((Math.PI * 2) / 12) * i + Math.random() * 0.5;
       const speed = 1.5 + Math.random() * 2.5;
       particles.push({
-        x: cx, y: cy,
+        x: cx,
+        y: cy,
         vx: Math.cos(angle) * speed,
         vy: Math.sin(angle) * speed,
         life: 1,
@@ -362,8 +382,22 @@
     ctx.beginPath();
     const s = size * 0.55;
     ctx.moveTo(cx, cy + s * 0.8);
-    ctx.bezierCurveTo(cx - s * 2, cy - s * 0.5, cx - s, cy - s * 2, cx, cy - s * 0.7);
-    ctx.bezierCurveTo(cx + s, cy - s * 2, cx + s * 2, cy - s * 0.5, cx, cy + s * 0.8);
+    ctx.bezierCurveTo(
+      cx - s * 2,
+      cy - s * 0.5,
+      cx - s,
+      cy - s * 2,
+      cx,
+      cy - s * 0.7,
+    );
+    ctx.bezierCurveTo(
+      cx + s,
+      cy - s * 2,
+      cx + s * 2,
+      cy - s * 0.5,
+      cx,
+      cy + s * 0.8,
+    );
     ctx.closePath();
     ctx.fill();
   }
@@ -371,7 +405,7 @@
   function drawPolygon(cx, cy, sides, radius) {
     ctx.beginPath();
     for (let i = 0; i < sides; i++) {
-      const angle = (Math.PI * 2 / sides) * i - Math.PI / 2;
+      const angle = ((Math.PI * 2) / sides) * i - Math.PI / 2;
       const x = cx + Math.cos(angle) * radius;
       const y = cy + Math.sin(angle) * radius;
       if (i === 0) ctx.moveTo(x, y);
@@ -515,7 +549,11 @@
     ctx.fillStyle = ARNE.WHITE;
     ctx.font = "bold 18px monospace";
     ctx.textAlign = "center";
-    ctx.fillText(`${mins}:${secs.toString().padStart(2, "0")}`, BASE / 2, MARGIN + 40);
+    ctx.fillText(
+      `${mins}:${secs.toString().padStart(2, "0")}`,
+      BASE / 2,
+      MARGIN + 40,
+    );
 
     // Misses
     ctx.textAlign = "left";
@@ -524,7 +562,7 @@
     ctx.fillText(`MISSES: ${misses}`, MARGIN, MARGIN + 40);
 
     // Pairs found
-    const found = cards.filter(c => c.matched).length / 2;
+    const found = cards.filter((c) => c.matched).length / 2;
     ctx.textAlign = "right";
     ctx.fillStyle = ARNE.LIME;
     ctx.fillText(`PAIRS: ${found}/${TOTAL_PAIRS}`, BASE - MARGIN, MARGIN + 40);
@@ -690,7 +728,11 @@
 
     ctx.fillStyle = ARNE.GRAY;
     ctx.font = "14px monospace";
-    ctx.fillText("MEMORIZE THE CARDS", BASE / 2, BOARD_TOP + BOARD_SIZE / 2 + 40);
+    ctx.fillText(
+      "MEMORIZE THE CARDS",
+      BASE / 2,
+      BOARD_TOP + BOARD_SIZE / 2 + 40,
+    );
   }
 
   // ── Game Screen ─────────────────────────────────────────
@@ -771,7 +813,11 @@
     // Stats
     ctx.fillStyle = ARNE.GRAY;
     ctx.font = "16px monospace";
-    ctx.fillText(`TIME REMAINING: ${Math.floor(timer)}s`, BASE / 2, BASE * 0.63);
+    ctx.fillText(
+      `TIME REMAINING: ${Math.floor(timer)}s`,
+      BASE / 2,
+      BASE * 0.63,
+    );
     ctx.fillText(`MISSES: ${misses}`, BASE / 2, BASE * 0.67);
 
     const alpha = 0.5 + 0.5 * Math.sin(performance.now() / 300);
@@ -821,9 +867,13 @@
     // Stats
     ctx.fillStyle = ARNE.GRAY;
     ctx.font = "18px monospace";
-    const matched = cards.filter(c => c.matched).length / 2;
-    ctx.fillText(`PAIRS FOUND: ${matched}/${TOTAL_PAIRS}`, BASE / 2, BASE * 0.55);
-    ctx.fillText(`MISSES: ${misses}`, BASE / 2, BASE * 0.60);
+    const matched = cards.filter((c) => c.matched).length / 2;
+    ctx.fillText(
+      `PAIRS FOUND: ${matched}/${TOTAL_PAIRS}`,
+      BASE / 2,
+      BASE * 0.55,
+    );
+    ctx.fillText(`MISSES: ${misses}`, BASE / 2, BASE * 0.6);
 
     const alpha = 0.5 + 0.5 * Math.sin(performance.now() / 300);
     ctx.globalAlpha = alpha;
@@ -853,8 +903,8 @@
   function getCardAt(px, py) {
     // Convert screen coords to canvas coords
     const rect = canvas.getBoundingClientRect();
-    const sx = (px - rect.left) / rect.width * BASE;
-    const sy = (py - rect.top) / rect.height * BASE;
+    const sx = ((px - rect.left) / rect.width) * BASE;
+    const sy = ((py - rect.top) / rect.height) * BASE;
     for (let r = 0; r < GRID_ROWS; r++) {
       for (let c = 0; c < GRID_COLS; c++) {
         const cx = cardX(c);
@@ -889,25 +939,37 @@
       handleInput(hit.row, hit.col);
     } else {
       // Click outside grid — still valid for title/end screens
-      if (gState === STATE.TITLE || gState === STATE.WIN || gState === STATE.LOSE) {
+      if (
+        gState === STATE.TITLE ||
+        gState === STATE.WIN ||
+        gState === STATE.LOSE
+      ) {
         startGame();
       }
     }
   });
 
   // Touch
-  canvas.addEventListener("touchstart", (e) => {
-    e.preventDefault();
-    const touch = e.touches[0];
-    const hit = getCardAt(touch.clientX, touch.clientY);
-    if (hit) {
-      handleInput(hit.row, hit.col);
-    } else {
-      if (gState === STATE.TITLE || gState === STATE.WIN || gState === STATE.LOSE) {
-        startGame();
+  canvas.addEventListener(
+    "touchstart",
+    (e) => {
+      e.preventDefault();
+      const touch = e.touches[0];
+      const hit = getCardAt(touch.clientX, touch.clientY);
+      if (hit) {
+        handleInput(hit.row, hit.col);
+      } else {
+        if (
+          gState === STATE.TITLE ||
+          gState === STATE.WIN ||
+          gState === STATE.LOSE
+        ) {
+          startGame();
+        }
       }
-    }
-  }, { passive: false });
+    },
+    { passive: false },
+  );
 
   // Keyboard
   window.addEventListener("keydown", (e) => {
