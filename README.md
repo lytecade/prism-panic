@@ -44,6 +44,6 @@ A memory match flash card game built with HTML5 Canvas and vanilla JavaScript. *
 - HTML5 Canvas rendering
 - Vanilla JavaScript (no external libraries)
 - Arne16 color scheme throughout
-- Responsive square canvas that scales to fit any browser window
+- Full-viewport responsive canvas adapting to desktop, tablet, and mobile screens in both portrait and landscape orientations
 - Mobile-friendly touch controls
 
